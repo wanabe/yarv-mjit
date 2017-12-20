@@ -840,6 +840,9 @@ mjit_compile(FILE *f, const struct rb_iseq_constant_body *body, const char *func
 	}
 	fprintf(f, "  }\n");
     }
+    fprintf(f, "  if (cfp->pc != cfp->iseq->body->iseq_encoded) {\n");
+    fprintf(f, "    return Qundef;\n");
+    fprintf(f, "  }\n");
 
     compile_insns(f, body, 0, 0, &status);
     compile_cancel_handler(f, body);
