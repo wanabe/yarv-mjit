@@ -163,6 +163,7 @@ compile_send(FILE *f, int insn, const VALUE *operands, unsigned int stack_size, 
 	fprintf(f, "  if (UNLIKELY(mjit_check_invalid_cc(stack[%d], ((CALL_CACHE)0x%"PRIxVALUE")->method_state, ((CALL_CACHE)0x%"PRIxVALUE")->class_serial))) {\n", stack_size - 1 - argc, (VALUE)cc, (VALUE)cc);
     }
     fprintf(f, "    cfp->sp = cfp->bp + %d;\n", stack_size + 1);
+    fprintf(f, "    cfp->pc -= %d;\n", insn_len(insn));
     fprintf(f, "    goto cancel;\n");
     fprintf(f, "  }\n");
 
@@ -198,6 +199,7 @@ fprint_opt_call_fallback(FILE *f, int insn, VALUE ci, VALUE cc, unsigned int sta
 {
     fprintf(f, "    if (result == Qundef) {\n");
     fprintf(f, "      cfp->sp = cfp->bp + %d;\n", stack_size + 1);
+    fprintf(f, "      cfp->pc -= %d;\n", insn_len(insn));
     fprintf(f, "      goto cancel;\n");
     fprintf(f, "    }\n");
     fprintf(f, "    stack[%d] = result;\n", stack_size - argc);
@@ -279,7 +281,7 @@ compile_insn(FILE *f, const struct rb_iseq_constant_body *body, const int insn, 
     unsigned int next_pos = pos + insn_len(insn);
 
     /* Move program counter to meet catch table condition and for JIT execution cancellation. */
-    fprintf(f, "  cfp->pc = (VALUE *)0x%"PRIxVALUE";\n", (VALUE)(body->iseq_encoded + pos));
+    fprintf(f, "  cfp->pc = (VALUE *)0x%"PRIxVALUE";\n", (VALUE)(body->iseq_encoded + next_pos));
 
     switch (insn) {
       case YARVINSN_nop:
