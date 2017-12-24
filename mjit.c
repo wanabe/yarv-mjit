@@ -682,6 +682,21 @@ static int finish_worker_p;
 /* Set to TRUE if worker is finished.  */
 static int worker_finished;
 
+static inline void
+convert_unit_and_replace(struct rb_mjit_unit *unit)
+{
+    void *func;
+    func = convert_unit_to_func(unit);
+
+    CRITICAL_SECTION_START(3, "in jit func replace");
+    if (unit->iseq) { /* Check whether GCed or not */
+	/* Usage of jit_code might be not in a critical section.  */
+	ATOMIC_SET(unit->iseq->body->jit_func, func);
+    }
+    remove_from_unit_queue(unit);
+    CRITICAL_SECTION_FINISH(3, "in jit func replace");
+}
+
 /* The function implementing a worker. It is executed in a separate
    thread by rb_thread_create_mjit_thread. It compiles precompiled header
    and then compiles requested ISeqs. */
@@ -713,16 +728,7 @@ worker()
 	CRITICAL_SECTION_FINISH(3, "in worker dequeue");
 
 	if (unit) {
-	    void *func;
-	    func = convert_unit_to_func(unit);
-
-	    CRITICAL_SECTION_START(3, "in jit func replace");
-	    if (unit->iseq) { /* Check whether GCed or not */
-		/* Usage of jit_code might be not in a critical section.  */
-		ATOMIC_SET(unit->iseq->body->jit_func, func);
-	    }
-	    remove_from_unit_queue(unit);
-	    CRITICAL_SECTION_FINISH(3, "in jit func replace");
+	    convert_unit_and_replace(unit);
 	}
     }
 
