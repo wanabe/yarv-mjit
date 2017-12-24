@@ -967,9 +967,33 @@ mjit_enable_get(void)
   return mjit_init_p ? Qtrue : Qfalse;
 }
 
+VALUE
+mjit_s_compile(VALUE recv, VALUE iseqw)
+{
+    struct rb_mjit_unit *unit;
+    const rb_iseq_t *iseq;
+
+    if (!mjit_init_p)
+	return Qnil;
+    iseq = rb_iseqw_to_iseq(iseqw);
+    create_unit(iseq);
+    if ((unit = iseq->body->jit_unit) == NULL)
+	return Qfalse;
+
+    CRITICAL_SECTION_START(3, "mjit_s_compile");
+    unit->id = current_unit_num++;
+    unit->next = unit->prev = unit;
+    iseq->body->jit_func = (void *)NOT_READY_JIT_ISEQ_FUNC;
+    CRITICAL_SECTION_FINISH(3, "mjit_s_compile");
+    convert_unit_and_replace(unit);
+
+    return iseqw;
+}
+
 void
 Init_MJIT(void)
 {
     rb_mMJIT = rb_define_module("MJIT");
     rb_define_singleton_method(rb_mMJIT, "enabled?", mjit_enable_get, 0);
+    rb_define_singleton_method(rb_mMJIT, "compile", mjit_s_compile, 1);
 }
