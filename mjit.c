@@ -82,6 +82,7 @@
 #include "mjit.h"
 #include "version.h"
 #include "gc.h"
+#include "iseq.h"
 
 extern void native_mutex_lock(rb_nativethread_lock_t *lock);
 extern void native_mutex_unlock(rb_nativethread_lock_t *lock);
@@ -129,6 +130,7 @@ struct rb_mjit_unit {
 
 /* TRUE if MJIT is initialized and will be used.  */
 int mjit_init_p = FALSE;
+int mjit_header_init_p = FALSE;
 
 /* Priority queue of iseqs waiting for JIT compilation.
    This variable is a pointer to head unit of the queue. */
@@ -714,6 +716,7 @@ worker()
 	return;
     }
 
+    mjit_header_init_p = TRUE;
     /* main worker loop */
     while (!finish_worker_p) {
 	struct rb_mjit_unit *unit;
@@ -975,6 +978,10 @@ mjit_s_compile(VALUE recv, VALUE iseqw)
 
     if (!mjit_init_p)
 	return Qnil;
+
+    while(!mjit_header_init_p)
+	rb_thread_schedule();
+
     iseq = rb_iseqw_to_iseq(iseqw);
     create_unit(iseq);
     if ((unit = iseq->body->jit_unit) == NULL)
