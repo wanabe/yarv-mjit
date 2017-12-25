@@ -990,12 +990,23 @@ mjit_s_compile(VALUE recv, VALUE obj)
 	iseqw = obj;
     }
     iseq = rb_iseqw_to_iseq(iseqw);
-    create_unit(iseq);
-    if ((unit = iseq->body->jit_unit) == NULL)
-	return Qfalse;
 
     CRITICAL_SECTION_START(3, "mjit_s_compile");
-    unit->id = current_unit_num++;
+    if (UNLIKELY((ptrdiff_t)iseq->body->jit_func > (ptrdiff_t)LAST_JIT_ISEQ_FUNC)) {
+	/* Already compiled.  */
+	CRITICAL_SECTION_FINISH(3, "mjit_s_compile");
+	return iseqw;
+    }
+    if ((unit = iseq->body->jit_unit) == NULL) {
+	create_unit(iseq);
+	if ((unit = iseq->body->jit_unit) == NULL) {
+	    /* Failure in creating the unit.  */
+	    CRITICAL_SECTION_FINISH(3, "mjit_s_compile");
+	    return Qfalse;
+	}
+
+        unit->id = current_unit_num++;
+    }
     unit->next = unit->prev = unit;
     iseq->body->jit_func = (void *)NOT_READY_JIT_ISEQ_FUNC;
     CRITICAL_SECTION_FINISH(3, "mjit_s_compile");
