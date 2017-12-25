@@ -987,11 +987,11 @@ mjit_s_compile(VALUE recv, VALUE obj)
     while(!mjit_header_init_p)
 	rb_thread_schedule();
 
-    if (rb_obj_is_proc(obj) || rb_obj_is_method(obj)) {
-	iseqw = rb_iseqw_of(obj);
+    if (rb_obj_is_iseq(obj)) {
+	iseqw = obj;
     }
     else {
-	iseqw = obj;
+	iseqw = rb_iseqw_of(obj);
     }
     iseq = rb_iseqw_to_iseq(iseqw);
 
