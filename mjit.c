@@ -141,6 +141,8 @@ static int current_unit_num;
 static int active_unit_num;
 /* A mutex for conitionals and critical sections.  */
 static rb_nativethread_lock_t mjit_engine_mutex;
+/* A mutex for converting unit.  */
+static rb_nativethread_lock_t mjit_converting_unit_mutex;
 /* A thread conditional to wake up `mjit_finish` at the end of PCH thread.  */
 static rb_nativethread_cond_t mjit_pch_wakeup;
 /* A thread conditional to wake up the client if there is a change in
@@ -730,9 +732,11 @@ worker()
 	unit = best_unit_from_unit_queue();
 	CRITICAL_SECTION_FINISH(3, "in worker dequeue");
 
+	native_mutex_lock(&mjit_converting_unit_mutex);
 	if (unit) {
 	    convert_unit_and_replace(unit);
 	}
+	native_mutex_unlock(&mjit_converting_unit_mutex);
     }
 
     CRITICAL_SECTION_START(3, "in the end of worker to update worker_finished");
@@ -991,10 +995,12 @@ mjit_s_compile(VALUE recv, VALUE obj)
     }
     iseq = rb_iseqw_to_iseq(iseqw);
 
+    native_mutex_lock(&mjit_converting_unit_mutex);
     CRITICAL_SECTION_START(3, "mjit_s_compile");
     if (UNLIKELY((ptrdiff_t)iseq->body->jit_func > (ptrdiff_t)LAST_JIT_ISEQ_FUNC)) {
 	/* Already compiled.  */
 	CRITICAL_SECTION_FINISH(3, "mjit_s_compile");
+	native_mutex_unlock(&mjit_converting_unit_mutex);
 	return iseqw;
     }
     if ((unit = iseq->body->jit_unit) == NULL) {
@@ -1002,6 +1008,7 @@ mjit_s_compile(VALUE recv, VALUE obj)
 	if ((unit = iseq->body->jit_unit) == NULL) {
 	    /* Failure in creating the unit.  */
 	    CRITICAL_SECTION_FINISH(3, "mjit_s_compile");
+	    native_mutex_unlock(&mjit_converting_unit_mutex);
 	    return Qfalse;
 	}
 
@@ -1011,6 +1018,7 @@ mjit_s_compile(VALUE recv, VALUE obj)
     iseq->body->jit_func = (void *)NOT_READY_JIT_ISEQ_FUNC;
     CRITICAL_SECTION_FINISH(3, "mjit_s_compile");
     convert_unit_and_replace(unit);
+    native_mutex_unlock(&mjit_converting_unit_mutex);
 
     return iseqw;
 }
