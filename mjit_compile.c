@@ -219,8 +219,45 @@ compile_insn(FILE *f, const struct rb_iseq_constant_body *body, const int insn, 
     /* Move program counter to meet catch table condition and for JIT execution cancellation. */
     fprintf(f, "  cfp->pc = (VALUE *)0x%"PRIxVALUE";\n", (VALUE)(body->iseq_encoded + next_pos));
     /* Move stack pointer to let stack values be used by VM when exception is raised */
-    fprintf(f, "  cfp->sp = cfp->bp + %d;\n", b->stack_size + 1); /* Note: This line makes JIT slow */
 
+    switch (insn) {
+      case BIN(nop):
+      case BIN(getlocal):
+      case BIN(setlocal):
+      case BIN(getspecial):
+      case BIN(setspecial):
+      case BIN(getinstancevariable):
+      case BIN(setinstancevariable):
+      case BIN(getclassvariable):
+      case BIN(setclassvariable):
+      case BIN(getconstant):
+      case BIN(setconstant):
+      case BIN(getglobal):
+      case BIN(setglobal):
+      case BIN(putnil):
+      case BIN(putself):
+      case BIN(putobject):
+      case BIN(pop):
+      case BIN(dup):
+      case BIN(dupn):
+      case BIN(swap):
+      case BIN(reverse):
+      case BIN(reput):
+      case BIN(topn):
+      case BIN(setn):
+      case BIN(adjuststack):
+      case BIN(getinlinecache):
+      case BIN(setinlinecache):
+      case BIN(getlocal_OP__WC__0):
+      case BIN(getlocal_OP__WC__1):
+      case BIN(setlocal_OP__WC__0):
+      case BIN(setlocal_OP__WC__1):
+      case BIN(putobject_OP_INT2FIX_O_0_C_):
+      case BIN(putobject_OP_INT2FIX_O_1_C_):
+	break;
+      default:
+	fprintf(f, "  cfp->sp = cfp->bp + %d;\n", b->stack_size + 1);
+    }
     switch (insn) {
       case BIN(nop):
 	/* nop */
